@@ -13,6 +13,8 @@ class Permutation:
             n: the size of the permutation, if None, it will be inferred from cycles or perm
         """
         if cycles is not None:
+            if not self._cycles_disjointQ(cycles):
+                raise ValueError("Cycles must be disjoint.")
             self.perm = self._cycles_to_array(cycles, size)
         elif perm is None:
             self.perm = []
@@ -20,6 +22,19 @@ class Permutation:
             self.perm = list(perm)
         self._shrink()
     
+    def _cycles_disjointQ(self, cycles):
+        """
+            Check if all cycles are disjoint.
+        """
+        seen = set()
+        for cycle in cycles:
+            for element in cycle:
+                if element in seen:
+                    return False
+                seen.add(element)
+        
+        return True
+
     def _cycles_to_array(self, cycles, n=None):
         """
             Convert cycles to array form.
@@ -264,33 +279,50 @@ class PermutationGroup:
         gen_strs = [repr(gen) for gen in self.generators]
         return f"PermutationGroup({', '.join(gen_strs)})"
     
-    def _sift(self, h : Permutation, return_decomposition=False):
+    def _sift(self, h : Permutation):
         """Sift the permutation h to find its position in the group."""
         if self.n == 0 or h.is_empty():
-            if return_decomposition:
-                return h, []
-            
             return h
 
-        i = h[self.n - 1]
+        i = h[self.base_point]
         if not self.orbit[i]:
-            if return_decomposition:
-                return h, []
-
             return h
 
         h = h * self.transversal[i].inv()
 
-        if return_decomposition:
-            decomposition = [self.transversal[i]]
-            if self.next is not None:
-                sifted_h, next_decomposition = self.next._sift(h, return_decomposition=True)
-                decomposition.extend(next_decomposition)
-            else:
-                sifted_h = h
-            return sifted_h, decomposition
-        else:
-            return self.next._sift(h)
+        return self.next._sift(h)
+        
+
+    def decompose(self, h : Permutation):
+        """
+        Decompose the permutation h into a product of representatives of the transversal.
+        Args:
+            h: Permutation to be decomposed
+        Returns:
+            A list `decomposition` is a list of permutations that represent the decomposition.
+        """
+        # Test if the permutation h is in the group
+        if not self.contains(h):
+            raise ValueError(f"The permutation {h} is not in the group {self}")
+        
+        return self._decompose(h)[1]
+
+    def _decompose(self, h : Permutation):
+        """
+            Decompose the permutation h into a product of representatives of the transversal.
+        """
+        if self.n == 0 or h.is_empty() or self.next is None:
+            return h, []
+        
+        i = h[self.base_point]
+        if not self.orbit[i]:
+            return h, []
+        
+        h = h * self.transversal[i].inv()
+        decomposition = [self.transversal[i]]
+        next_h, next_decomp = self.next._decompose(h)
+        decomposition.extend(next_decomp)
+        return next_h, decomposition
 
     def _extend_transversal(self, t : Permutation):
         """
@@ -326,6 +358,10 @@ class PermutationGroup:
         """
         Check if the group contains the permutation h.
         """
+        # Test the length of the permutation
+        if len(h.perm) > self.n:
+            return False
+        
         test_h = Permutation(perm=h.perm)
         test_h = self._sift(test_h)
         return test_h.is_empty()
