@@ -1,5 +1,6 @@
-from sympy.combinatorics import Permutation, PermutationGroup
+# from sympy.combinatorics import Permutation, PermutationGroup
 import itertools
+from permutation import Permutation, PermutationGroup
 
 class RubiksCubeSolver:
     def __init__(self):
