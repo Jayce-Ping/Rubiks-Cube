@@ -1,4 +1,3 @@
-# from sympy.combinatorics import Permutation, PermutationGroup
 import itertools
 from permutation import Permutation, PermutationGroup
 
