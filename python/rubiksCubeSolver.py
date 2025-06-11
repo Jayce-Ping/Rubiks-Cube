@@ -1,5 +1,6 @@
 from typing import Dict, List, Iterable
 from itertools import permutations, chain
+from sympy.core.random import seed as sympy_seed
 from sympy.combinatorics.permutations import Permutation
 from minkwitz import SGSPermutationGroup
 
@@ -22,6 +23,7 @@ class RubiksCubeSolver:
             for key, value in operations.items()
         }
         self.rubiksCubeGroup = SGSPermutationGroup(self.operations, deterministic=True)
+        self.group = self.rubiksCubeGroup.G
         if self.rubiksCubeGroup.nu is None:
             self.rubiksCubeGroup.getShortWords(n=10000, s=2000, w=20)
 
@@ -61,6 +63,24 @@ class RubiksCubeSolver:
             k : [i] * 9 for i, k in enumerate("TLFRBD")
         }
     
+    def random_state(self, seed=None) -> dict:
+        """
+            Generates a random state of the rubik's cube.
+            Args:
+                seed (int): The seed for the random number generator
+            Returns:
+                dict: The state of the rubik's cube
+        """ 
+        if seed is not None:
+            sympy_seed(seed)
+
+        state_permutation_array = self.group.random(af=True)
+        init_state = self.init_state
+        state_seq = state_dict_to_sequence(init_state)
+        permuted_seq = [state_seq[i] for i in state_permutation_array]
+        state = state_sequence_to_dict(permuted_seq, face_ids=list(self.faceIndices))
+        return state
+
     def getCellNumber(self, cell : tuple):
         faceIdMap = {
             'T': 0,
@@ -192,7 +212,8 @@ class RubiksCubeSolver:
                 op = self.operations[op]
 
             state_seq = state_dict_to_sequence(state)
-            permuted_seq : List[int] = [int(op.array_form[i]) for i in state_seq]
+            # permuted_seq : List[int] = op(state_seq)
+            permuted_seq = [state_seq[i] for i in op.array_form]
             state = state_sequence_to_dict(permuted_seq, face_ids=list(self.faceIndices))
             if process:
                 applying_process.append(state.copy())
