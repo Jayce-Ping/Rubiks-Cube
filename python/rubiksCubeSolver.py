@@ -1,22 +1,29 @@
-import itertools
-from permutation import Permutation, PermutationGroup
+from typing import Dict, List, Iterable
+from itertools import permutations, chain
+from sympy.combinatorics.permutations import Permutation
+from minkwitz import SGSPermutationGroup
 
 class RubiksCubeSolver:
     def __init__(self):
         '''
             Initializes the RubiksCubeSolver
         '''
-
-        self.operations = {
-            "T": Permutation([[0, 2, 8, 6], [1, 5, 7, 3], [9, 36, 27, 18], [10, 37, 28, 19], [11, 38, 29, 20]]),
-            "L": Permutation([[0, 18, 45, 44], [3, 21, 48, 41], [6, 24, 51, 38], [9, 11, 17, 15], [10, 14, 16, 12]]),
-            "F": Permutation([[6, 27, 47, 17], [7, 30, 46, 14], [8, 33, 45, 11], [18, 20, 26, 24], [19, 23, 25, 21]]),
-            "R": Permutation([[2, 42, 47, 20], [5, 39, 50, 23], [8, 36, 53, 26], [27, 29, 35, 33], [28, 32, 34, 30]]),
-            "B": Permutation([[0, 15, 53, 29], [1, 12, 52, 32], [2, 9, 51, 35], [36, 38, 44, 42], [37, 41, 43, 39]]),
-            "D": Permutation([[15, 24, 33, 42], [16, 25, 34, 43], [17, 26, 35, 44], [45, 47, 53, 51], [46, 50, 52, 48]])
+        size = 54
+        operations = {
+            "T": [[0, 2, 8, 6], [1, 5, 7, 3], [9, 36, 27, 18], [10, 37, 28, 19], [11, 38, 29, 20]],
+            "L": [[0, 18, 45, 44], [3, 21, 48, 41], [6, 24, 51, 38], [9, 11, 17, 15], [10, 14, 16, 12]],
+            "F": [[6, 27, 47, 17], [7, 30, 46, 14], [8, 33, 45, 11], [18, 20, 26, 24], [19, 23, 25, 21]],
+            "R": [[2, 42, 47, 20], [5, 39, 50, 23], [8, 36, 53, 26], [27, 29, 35, 33], [28, 32, 34, 30]],
+            "B": [[0, 15, 53, 29], [1, 12, 52, 32], [2, 9, 51, 35], [36, 38, 44, 42], [37, 41, 43, 39]],
+            "D": [[15, 24, 33, 42], [16, 25, 34, 43], [17, 26, 35, 44], [45, 47, 53, 51], [46, 50, 52, 48]]
         }
-
-        self.rubiksCubeGroup = PermutationGroup([generator for generator in self.operations.values()])
+        self.operations : Dict[str, Permutation] = {
+            key: Permutation(value, size=size)
+            for key, value in operations.items()
+        }
+        self.rubiksCubeGroup = SGSPermutationGroup(self.operations, deterministic=True)
+        if self.rubiksCubeGroup.nu is None:
+            self.rubiksCubeGroup.getShortWords(n=10000, s=2000, w=20)
 
         self.faceIndices = self.operations.keys()
 
@@ -48,6 +55,11 @@ class RubiksCubeSolver:
         
         self.centerBlocks = [[('T', 5)], [('L', 5)], [('F', 5)], [('R', 5)], [('B', 5)], [('D', 5)]]
 
+    @property
+    def init_state(self):
+        return {
+            k : [i] * 9 for i, k in enumerate("TLFRBD")
+        }
     
     def getCellNumber(self, cell : tuple):
         faceIdMap = {
@@ -63,6 +75,9 @@ class RubiksCubeSolver:
 
     def matchCellPermutation(self, state : dict, ref_blocks: list, colorIdToFaceId : dict):
         
+        # Make a deep copy of ref_blocks to avoid modifying the original list
+        ref_blocks = [list(block) for block in ref_blocks]
+
         state_blocks = [
             [(faceId, cellId, state[faceId][cellId - 1]) for faceId, cellId in ref_block]
             for ref_block in ref_blocks
@@ -76,7 +91,7 @@ class RubiksCubeSolver:
             
             matched = False
             for idx, ref_block in enumerate(ref_blocks):
-                perm = itertools.permutations(ref_block)
+                perm = permutations(ref_block)
                 
                 for p in perm:
                     ref_faceIds = tuple(q[0] for q in p)
@@ -98,26 +113,12 @@ class RubiksCubeSolver:
 
         
         return cellPermutationMap
-                
-            
     
 
-    def solve(self, state : dict, permutation=False):
-        '''
-            Solves the rubik's cube given a state
-            Args:
-                state (dict): The state of the rubik's cube
-                state is in a form of
-                {
-                    "T": [xt, ..., yt],
-                    "L": [xl, ..., yl],
-                    "F": [xf, ..., yf],
-                    "R": [xr, ..., yr],
-                    "B": [xb, ..., yb],
-                    "D": [xd, ..., yd]
-                }
-                where xt, ..., yt are the colors (integers) from 1 to 6 of the top face of the rubik's cube.
-        '''
+    def get_state_permutation(self, state : dict) -> Permutation:
+        """
+            Find a permutation that takes the initial state of the rubik's cube to the given state.
+        """
         # Get block color map according to the center blocks
         colorIdToFaceId = {colorId: faceId for faceId, colorId in zip(self.faceIndices, [blocks[4] for blocks in state.values()])}
         
@@ -136,24 +137,93 @@ class RubiksCubeSolver:
         # The permutation of the rubik's cube to obtain the current state
         state_permutation = Permutation.from_sequence([cell_pair[1] for cell_pair in encoded_CellPermutation])
 
-        if not self.rubiksCubeGroup.contains(state_permutation):
+        return state_permutation
+
+
+    def solve(self, state : dict):
+        '''
+            Solves the rubik's cube given a state
+            Args:
+                state (dict): The state of the rubik's cube
+                state is in a form of
+                {
+                    "T": [xt, ..., yt],
+                    "L": [xl, ..., yl],
+                    "F": [xf, ..., yf],
+                    "R": [xr, ..., yr],
+                    "B": [xb, ..., yb],
+                    "D": [xd, ..., yd]
+                }
+                where xt, ..., yt are the colors (integers) from 1 to 6 of the top face of the rubik's cube.
+        '''
+        state_permutation = self.get_state_permutation(state)
+
+        if not self.rubiksCubeGroup.G.contains(state_permutation):
             # If the current state is a valid state of the rubik's cube, return None
-            return None
+            raise ValueError("Invalid state: The given state is not a valid Rubik's Cube configuration.")
 
-        # The state is a valid state, return the permutation to take the rubik's cube to the solved state
-        if permutation is True:
-            # It requires to return the permutation itself
-            return state_permutation
+        perm_words = self.rubiksCubeGroup.FactorPermutation(state_permutation)
+        # perm_words = [w1, w2, ...], where each w_i is a word in the generators of the Rubik's Cube group
+        # each w_i is represented as a list of generator names or with a '-' sign for inverses, ['T', 'L', '-F', 'R', ...]
+        # we have w1w2... = word(state_permutation)
+
+        # The operations takes given state back to the initial state is the reverse of the operations that take the initial state to the given state
+        operations = [s[1] if s[0] == '-' else '-' + s[0] for s in perm_words]
+        # Reverse the sign of each operation to get inverse operations
+        # Apply operations from left to right on the given state to get the initial state
+
+        return operations
+    
+    def apply_operations(self, state : dict, operations : Iterable[str], process=True) -> List[Dict] | Dict:
+        """
+            Applies the given operations on the state of the rubik's cube.
+            Args:
+                state (dict): The state of the rubik's cube
+                operations (List[str]): The operations to apply on the state
+                process (bool): Whether to provide a process of applying the operations
+            Returns:
+                dict: The new state of the rubik's cube after applying the operations
+        """
+        applying_process = []
+        for op in operations:
+            if op[0] == '-':
+                op = ~self.operations[op[1]]
+            else:
+                op = self.operations[op]
+
+            state_seq = state_dict_to_sequence(state)
+            permuted_seq : List[int] = [int(op.array_form[i]) for i in state_seq]
+            state = state_sequence_to_dict(permuted_seq, face_ids=list(self.faceIndices))
+            if process:
+                applying_process.append(state.copy())
+
+        if process:
+            return applying_process
         else:
-            # It requires to return the sequence of operations to take the rubik's cube to the solved state
-            generator_sequence = reversed(self.rubiksCubeGroup.generator_product(state_permutation**-1,  original=True))
-            operations = []
-            for gen in generator_sequence:
-                for operationId, operation in self.operations.items():
-                    if gen == operation:
-                        operations.append(operationId)
-                    elif gen**(-1) == operation:
-                        operations.append("-" + operationId)
+            return state
+        
 
-            return operations
-         
+    
+
+            
+def state_dict_to_sequence(state: Dict[str, List[int]]) -> List[int]:
+    """
+        Converts the state dictionary to a sequence of colors.
+        Args:
+            state (dict): The state of the rubik's cube
+        Returns:
+            List[int]: The sequence of colors
+    """
+    return list(chain.from_iterable(state.values()))
+
+
+def state_sequence_to_dict(sequence: List[int], face_ids : List[str] = ['T', 'L', 'F', 'R', 'B', 'D']) -> Dict[str, List[int]]:
+    """
+        Converts the sequence of colors to a state dictionary.
+        Args:
+            sequence (List[int]): The sequence of colors
+        Returns:
+            dict: The state of the rubik's cube
+    """
+    return {k: sequence[i:i+9] for i, k in zip(range(0, 54, 9), face_ids)}
+    
