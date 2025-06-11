@@ -8,8 +8,7 @@
 
 - The visualization for solution steps are provided as well.
 
-- The main idea of solution is not based on traditional 3-order Rubik's Cube formulas, but the algorithm to **decompose a group element into a product of group generators**.
-> Python version is still in progress, since the `sympy` lib cannot solve the `generator_list` efficiently.
+- The main idea of solution is not based on traditional 3-order Rubik's Cube formulas, but the algorithm to **decompose a group element into a product of group generators and their inverses**.
 
 
 
@@ -38,8 +37,8 @@ D = ((16, 25, 34, 43) (17, 26, 35, 44) (18, 27, 36, 45) (46, 48, 54, 52) (47, 51
 ```
 
 
-- The solution is a sequence of generators represented as operation identifiers. With the permutation of the given state obtained, we can represent this inverse permutation as a product of group generators, i.e. a sequence of rotations on different faces.
+- The solution is a sequence of generators represented as operation identifiers. With the permutation of the given state obtained, we can represent this inverse permutation as a product of group generators, i.e. a sequence of rotations on different faces, which takes the current state back to the initial state - solved!
 - In Mathematica, [**GroupElementToWord**](https://reference.wolfram.com/language/ref/GroupElementToWord.html.en) is used to convert the permutation to product of generators.
-- In Python, [sympy.combinatorics.perm_groups.PermutationGroup.generator_product](https://docs.sympy.org/latest/modules/combinatorics/perm_groups.html#sympy.combinatorics.perm_groups.PermutationGroup.generator_product) is used to convert the permutation to product of generators. But it is very much slow if `original` is set `True`, which is required in this case.
+- For Python implementation, we utilized [Minkwitz's algorithm](https://www.sciencedirect.com/science/article/pii/S0747717198902024) to factorize the permutation to product of generators and their inverses.
 
 
