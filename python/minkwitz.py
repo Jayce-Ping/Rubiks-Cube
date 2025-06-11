@@ -131,7 +131,6 @@ def applyPerm(sol, PG):
     return target
 
 
-
 def oneStep(N, gens, geninvs, base, i, t, nu):
     j = t.permutation.array_form[base[i]]  # b_i ^ t
     t1 = t.inverse(geninvs)
