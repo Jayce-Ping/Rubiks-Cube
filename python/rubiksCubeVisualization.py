@@ -4,6 +4,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import matplotlib.animation as animation
 from rubiksCubeSolver import RubiksCubeSolver, state_dict_to_sequence, state_sequence_to_dict
+import argparse
 
 class RubiksCubeVisualizer:
     def __init__(self):
@@ -366,22 +367,38 @@ class RubiksCubeVisualizer:
         return fig, ax
 
 
+def parse_args():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(description="Rubik's Cube Visualizer")
+    parser.add_argument('--save', type=str, default=None, help="Path to save the animation (e.g., 'animation.gif')")
+    parser.add_argument('--speed', type=int, default=1, help="Speed of the animation (default: 1)")
+    parser.add_argument('--seed', type=int, default=None, help="Random seed for generating initial state (default: 0)")
+    return parser.parse_args()
+
 def main():
     """Main function with better error handling"""
     print("🎯 Rubik's Cube Visualizer")
     print("=" * 30)
+    args = parse_args()
+    print(f"Arguments: {args}")
+    for arg, value in vars(args).items():
+        print(f"{arg:>20}={value}")
+
+    seed = args.seed
+    save_path = args.save
+    speed = args.speed
     
     try:
         visualizer = RubiksCubeVisualizer()
         
         # Example state
-        init_state = visualizer.solver.random_state(seed=0)
+        init_state = visualizer.solver.random_state(seed=seed)
 
         # Get the sequence of operations
         sol = visualizer.solver.solve(init_state)
 
         # Visualize the solving process
-        visualizer.create_sequence_animation(init_state, sol)
+        visualizer.create_sequence_animation(init_state, sol, speed=speed, save_path=save_path)
         
     except Exception as e:
         print(f"Error in main: {e}")

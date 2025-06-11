@@ -236,6 +236,9 @@ def factorizeM(N : int,
     perm = target
     for i in range(len(base)):
         omega = perm.array_form[base[i]]
+        if nu[i][omega] is None:
+            raise RuntimeError(f'Unexpected error: No word found for {omega} in orbit {i}, base {base[i]}')
+        
         perm *= nu[i][omega].permutation
         result_list = result_list + nu[i][omega].words
 

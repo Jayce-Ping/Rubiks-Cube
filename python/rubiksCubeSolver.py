@@ -222,9 +222,6 @@ class RubiksCubeSolver:
             return applying_process
         else:
             return state
-        
-
-    
 
             
 def state_dict_to_sequence(state: Dict[str, List[int]]) -> List[int]:
