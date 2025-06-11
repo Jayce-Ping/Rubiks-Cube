@@ -16,10 +16,14 @@ class PermWord:
         self.permutation = perms
         self.flag = True
 
-    def inverse(self,geninvs):
+    @property
+    def is_identity(self):
+        return self.permutation.is_identity
+
+    def inverse(self, geninvs : Dict[str, str]) -> PermWord:
         inv_perm = ~self.permutation
         inv_word = invwords(self.words, geninvs)
-        return PermWord(inv_perm,inv_word)
+        return PermWord(inv_perm, inv_word)
 
     def __mul__(self, other : PermWord):
         result_perm = self.permutation * other.permutation
@@ -39,7 +43,7 @@ class SGSPermutationGroup:
             self,
             generators_dict : Dict[str, Permutation | List[int]],
             deterministic : bool = True,
-            params : Dict[str, int] = {'n': 10000, 's': 2000, 'w': 20}
+            params : Dict[str, int] = {'n': 10000, 's': 2000, 'w': 30}
         ):
         self.N = max([max(generators_dict[g]) for g in generators_dict]) + 1
 
@@ -131,7 +135,14 @@ def applyPerm(sol, PG):
     return target
 
 
-def oneStep(N, gens, geninvs, base, i, t, nu):
+def oneStep(
+        N : int,
+        gens : Dict[str, Permutation],
+        geninvs : Dict[str, str],
+        base : List[int],
+        i : int,
+        t : PermWord,
+        nu : List[List[Optional[PermWord]]]) -> PermWord:    
     j = t.permutation.array_form[base[i]]  # b_i ^ t
     t1 = t.inverse(geninvs)
     if nu[i][j] is not None:
@@ -139,33 +150,56 @@ def oneStep(N, gens, geninvs, base, i, t, nu):
         result.words = simplify(result.words)
         if len(t.words) < len(nu[i][j].words):
             nu[i][j] = t1
-            oneStep(N, gens,geninvs, base, i, t1, nu)
+            oneStep(N, gens, geninvs, base, i, t1, nu)
     else:
         nu[i][j] = t1
         oneStep(N, gens, geninvs, base, i, t1, nu)
-        result =  PermWord(Permutation(N),[])
+        result = PermWord(Permutation(N),[])
     return result
 
-def oneRound(N, gens,geninvs, base, lim, c, nu, t):
+def oneRound(
+        N : int,
+        gens : Dict[str, Permutation],
+        geninvs : Dict[str, str],
+        base : List[int],
+        lim : int,
+        c : int,
+        nu : List[List[Optional[PermWord]]],
+        t : PermWord
+    ) -> None:
     i = c
-    while i < len(base) and len(t.words)>0 and len(t.words) < lim:
+    # while i < len(base) and len(t.words) > 0 and len(t.words) < lim:
+    while i < len(base) and not t.is_identity and len(t.words) < lim:
         t = oneStep(N, gens, geninvs, base, i, t, nu)
         i += 1
 
-def oneImprove(N, gens,geninvs, base, lim, nu):
+def oneImprove(
+        N : int,
+        gens : Dict[str, Permutation],
+        geninvs : Dict[str, str],
+        base : List[int],
+        lim : int,
+        nu : List[List[Optional[PermWord]]]
+    ) -> None:
     for j in range(len(base)):
         for x in nu[j]:
             for y in nu[j]:
-                if x != None and y != None  and (x.flag or y.flag):
+                if x != None and y != None and (x.flag or y.flag):
                     t = x * y
                     oneRound(N, gens, geninvs, base, lim, j, nu, t)
 
         for x in nu[j]:
             if x is not None:
-                pw = x
-                x.flag = False
+                x.flag = False # x is visited
 
-def fillOrbits(N, gens,geninvs, base, lim, nu):
+def fillOrbits(
+        N : int,
+        gens : Dict[str, Permutation],
+        geninvs : Dict[str, str],
+        base : List[int],
+        lim : int,
+        nu : List[List[Optional[PermWord]]]
+    ) -> None:
     for i in range(len(base)):
         orbit = []  # partial orbit already found
         for y in nu[i]:
@@ -173,6 +207,7 @@ def fillOrbits(N, gens,geninvs, base, lim, nu):
                 j = y.permutation.array_form[base[i]]
                 if j not in orbit:
                     orbit.append(j)
+    
         for j in range(i + 1, len(base)):
             for x in nu[j]:
                 if x is not None:
@@ -181,7 +216,7 @@ def fillOrbits(N, gens,geninvs, base, lim, nu):
                     new_pts = [p for p in orbit_x if p not in orbit]
 
                     for p in new_pts:
-                        t1 = x1 * (nu[i][x1.permutation.array_form[p]])
+                        t1 = x1 * nu[i][x1.permutation.array_form[p]]
                         t1.words = simplify(t1.words)
                         if len(t1.words) < lim:
                             nu[i][p] = t1
@@ -197,14 +232,15 @@ def buildShortWordsSGS(
         N : int,
         gens : Dict[str, Permutation],
         geninvs : Dict[str, str],
-        base : List[int], n : int, s : int, w : int, sum_orbit_len : int) -> List[List[Optional[PermWord]]]:
+        base : List[int], n : int, s : int, w : int, sum_orbit_len : int
+    ) -> List[List[Optional[PermWord]]]:
     nu : List[List[Optional[PermWord]]] = [[None for _ in range(N)] for _ in range(len(base))]
     for i in range(len(base)):
         nu[i][base[i]] = PermWord(Permutation(N),[])
     
     number_of_words = 0 # number of words found
     maximum = n # maximum number of iterations
-    lim = float(w) # limit for word size
+    lim = w # limit for word size
     cnt = 0 # counter for iterations
     iter_gen = chain.from_iterable(product(list(gens), repeat=i) for i in range(1, 12))
     for gen in iter_gen:
@@ -215,7 +251,7 @@ def buildShortWordsSGS(
         perm = gen_perm_from_word(gens, gen) # generate permutation from word
         pw = PermWord(perm, list(gen)) # Create PermWord object
         oneRound(N, gens, geninvs, base, lim, 0, nu, pw) # Update nu with the new word
-        nw0 = number_of_words
+
         number_of_words =  np.sum([np.sum([x != None for x in nu_i]) for nu_i in nu]) # Count number of words
         
         if cnt % s == 0:
@@ -224,6 +260,7 @@ def buildShortWordsSGS(
                 fillOrbits(N, gens, geninvs, base, lim, nu) # Fill the orbits with new words
             
             lim *= 5 / 4 # Increase the limit for word size
+            lim = int(lim)
                 
     return nu
 
