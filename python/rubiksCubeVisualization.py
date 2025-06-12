@@ -156,24 +156,27 @@ class RubiksCubeVisualizer:
         ax.clear()
         
         # Set limits
-        ax.set_xlim([-2.5, 2.5])
-        ax.set_ylim([-2.5, 2.5])
-        ax.set_zlim([-2.5, 2.5])
+        ax.set_xlim([-2, 2])
+        ax.set_ylim([-2, 2])
+        ax.set_zlim([-2, 2])
         
+        # 设置背景为深色
+        fig = ax.figure
+        fig.patch.set_facecolor('#1a1a1a')
+        ax.set_facecolor('#2d2d2d')
+
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+
         # Clean appearance
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.set_zticks([])
+        ax.set_axis_off()
         
         # Set title
-        ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
+        ax.set_title(title, fontsize=14, fontweight='bold', pad=20, color='white')
         
         # Set viewing angle
-        ax.view_init(elev=20, azim=45)
-
-        # Hide axis
-        ax.set_axis_off()
-
+        ax.view_init(elev=25, azim=45)
 
     def _draw_static_cube(self, ax, state):
         """Draw cube in static state"""
